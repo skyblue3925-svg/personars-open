@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "persona-interview-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-28",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  // 배포 전에 ALLOWED_ORIGINS에 본인 사이트 주소를, kv_namespaces.id에 본인 KV ID를 넣으세요.
+  "vars": {
+    "ALLOWED_ORIGINS": "http://127.0.0.1:5001,http://localhost:5001",
+    "DAILY_LIMIT": "1500"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "RATE_KV",
+      "id": "<YOUR_KV_NAMESPACE_ID>"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PERSONA_SEARCH",
+      "bucket_name": "persona-nemotron-search"
+    }
+  ]
+}
