@@ -63,3 +63,7 @@ VITE_INTERVIEW_COACH_API_URL= # AI 코치 서버 주소
 - 페르소나 후보 패킷(`public/data/nemotron-persona-packet.json`)은 NVIDIA의 [Nemotron-Personas-Korea](https://huggingface.co/datasets/nvidia/Nemotron-Personas-Korea)에서 뽑은 합성 인물 샘플입니다. 실제 사람이 아니며 CC BY 4.0으로 제공됩니다. 자세한 출처 표시는 [NOTICE.md](NOTICE.md)를 보세요.
 - 이 데이터는 실제 통계 예측이나 실제 주민 여론이 아니라 수업용 시나리오 탐색에 쓰는 자료입니다.
 - 학생 이름, 학번, 학교 정보 등 개인정보를 이 도구나 외부 AI 서비스에 입력하지 마세요.
+
+## 라이선스
+
+MIT. 자세한 내용은 [LICENSE](LICENSE)를 보세요. 포함된 페르소나 데이터는 별도로 CC BY 4.0이며 [NOTICE.md](NOTICE.md)에 출처가 있습니다.
