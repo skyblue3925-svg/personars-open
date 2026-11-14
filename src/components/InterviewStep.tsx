@@ -299,7 +299,14 @@ export function InterviewStep({ project, activityMode = 'interview', onTurnAdded
         project.draft,
         { apiUrl: aiEnabled ? undefined : '' }
       );
-      setReportText(response.text.replace(/\[가상 페르소나 시뮬레이션\]\n/, ''));
+      const reportBody = response.text.replace(/\[가상 페르소나 시뮬레이션\]\n/, '');
+      setReportText(
+        response.source === 'llm'
+          ? reportBody
+          : `${reportBody}
+
+(AI 서버가 연결되지 않았거나 응답하지 않아, AI 분석이 아니라 미리 만들어 둔 연습용 응답으로 표시된 내용입니다.)`,
+      );
     } catch {
       setReportText('보고서 생성에 실패했습니다. 연결을 확인하고 다시 시도하세요.');
     } finally {

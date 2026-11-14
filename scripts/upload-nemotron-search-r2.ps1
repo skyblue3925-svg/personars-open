@@ -1,5 +1,5 @@
 param(
-  [string]$IndexDir = "C:\tmp\nemotron-row-search-district-full",
+  [Parameter(Mandatory = $true)][string]$IndexDir,
   [string]$Bucket = "persona-nemotron-search"
 )
 

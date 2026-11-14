@@ -28,3 +28,6 @@ node-v*.msi
 /worker/worker/
 
 .vercel
+
+# Nemotron 원본 내려받기 캐시
+.cache/

@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import quote
 
-LOCAL_PYDEPS = Path("C:/tmp/persona_pydeps")
-if LOCAL_PYDEPS.exists():
-    sys.path.insert(0, str(LOCAL_PYDEPS))
 
 PERSONA_TYPES = [
     "professional_persona",

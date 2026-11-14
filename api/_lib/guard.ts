@@ -25,6 +25,8 @@ type GuardResponse = {
 export const MAX_BODY_CHARS = 60_000;
 
 const counters = new Map<string, number>();
+const MAX_COUNTER_KEYS = 5_000;
+let counterDay = '';
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -46,6 +48,9 @@ export function isAllowedOrigin(origin: string | undefined, host: string | undef
   }
 }
 
+// 주의: x-forwarded-for의 첫 값을 믿는다. Vercel은 이 헤더를 자기가 본 클라이언트 IP로 채우지만,
+// 앞단에 다른 프록시가 있거나 Vercel이 아닌 곳에 배포하면 위조될 수 있다. 그런 환경에서는 이 한도에 기대지 말고
+// 호스팅의 속도 제한을 쓰라.
 function clientIp(req: GuardRequest): string {
   const forwarded = headerValue(req.headers?.['x-forwarded-for']);
   return forwarded?.split(',')[0]?.trim() || 'unknown';
@@ -57,9 +62,14 @@ function overDailyLimit(ip: string, now = new Date()): boolean {
   const day = now.toISOString().slice(0, 10);
   const key = `${day}:${ip}`;
 
-  // 날짜가 바뀐 옛 항목을 정리한다.
-  for (const existing of counters.keys()) {
-    if (!existing.startsWith(day)) counters.delete(existing);
+  // 날짜가 바뀌면 옛 항목을 비운다. 한 날에도 키가 너무 많아지면(IP를 바꿔 가며 부르는 경우) 오래된 것부터 지워 메모리를 묶는다.
+  if (day !== counterDay) {
+    counters.clear();
+    counterDay = day;
+  }
+  if (counters.size >= MAX_COUNTER_KEYS && !counters.has(key)) {
+    const oldest = counters.keys().next().value;
+    if (oldest !== undefined) counters.delete(oldest);
   }
 
   const current = counters.get(key) ?? 0;

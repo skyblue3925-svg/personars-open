@@ -4,7 +4,8 @@ import { readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
-const indexDir = resolve(args.indexDir ?? 'C:/tmp/nemotron-row-search-district-full');
+if (!args.indexDir) throw new Error('--indexDir 로 색인 폴더(manifest.json이 있는 곳)를 지정하세요.');
+const indexDir = resolve(args.indexDir);
 const bucket = args.bucket ?? 'persona-nemotron-search';
 const concurrency = Number(args.concurrency ?? 6);
 const statePath = resolve(args.state ?? join(indexDir, '.r2-upload-state.json'));

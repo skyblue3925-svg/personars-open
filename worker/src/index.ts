@@ -1,6 +1,6 @@
 import { buildSystemPrompt, ensurePrefix } from './prompt';
 import { isValidPersonaSearchRequest, searchPersonaR2, type PersonaSearchR2Bucket } from './personaSearch';
-import { isOverDailyLimit } from './rateLimit';
+import { isOverDailyLimit, isOverSearchLimit } from './rateLimit';
 import type { RateLimitStore } from './types';
 
 const GEMINI_MODEL_IDS = ['gemini-3-flash-preview', 'gemini-2.5-flash'] as const;
@@ -27,11 +27,13 @@ type Env = {
   GEMINI_API_KEY_POOL?: string;
   ALLOWED_ORIGINS?: string;
   DAILY_LIMIT?: string;
+  SEARCH_DAILY_LIMIT?: string;
   RATE_KV: RateLimitStore;
   PERSONA_SEARCH?: PersonaSearchR2Bucket;
 };
 
 const MAX_BODY_CHARS = 60_000;
+const MAX_SEARCH_BODY_CHARS = 10_000;
 const MAX_LATEST_CHARS = 1_000;
 const MAX_HISTORY_TURNS = 20;
 const MAX_HISTORY_TEXT_CHARS = 1_500;
@@ -194,9 +196,14 @@ async function handlePersonaSearch(request: Request, env: Env, cors: Headers): P
   if (!isAllowedOrigin(request.headers.get('Origin'), env)) return json({ error: 'origin_not_allowed' }, 403, cors);
   if (!env.PERSONA_SEARCH) return json({ error: 'persona_search_unavailable' }, 503, cors);
 
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  if (await isOverSearchLimit(ip, env)) return json({ error: 'daily_limit_exceeded' }, 429, cors);
+
   let body: unknown;
   try {
-    body = await request.json();
+    const raw = await request.text();
+    if (raw.length > MAX_SEARCH_BODY_CHARS) return json({ error: 'payload_too_large' }, 413, cors);
+    body = JSON.parse(raw);
   } catch {
     return json({ error: 'invalid_json' }, 400, cors);
   }
@@ -482,6 +489,7 @@ function isValidChatRequest(body: ChatRequest): boolean {
       body.personaId &&
       body.topic &&
       body.researchQuestion &&
+      typeof body.latest === 'string' &&
       body.latest &&
       body.persona?.label &&
       Array.isArray(body.persona.livedExperiences) &&

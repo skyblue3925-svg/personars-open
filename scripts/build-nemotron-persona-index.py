@@ -29,7 +29,7 @@ EXPECTED_PERSONAS = 7_000_000
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build a compact app candidate packet from Nemotron-Personas-Korea.")
     parser.add_argument("--output", required=True, help="Output JSON packet path.")
-    parser.add_argument("--cache-dir", default="C:/tmp/nemotron-personas-korea", help="Download/cache directory.")
+    parser.add_argument("--cache-dir", default=".cache/nemotron-personas-korea", help="Download/cache directory.")
     parser.add_argument("--max-per-stratum", type=int, default=3, help="Reservoir size per persona_type/province/age_band/sex stratum.")
     parser.add_argument("--batch-size", type=int, default=4096, help="Parquet record batch size.")
     parser.add_argument("--seed", type=int, default=20260429, help="Reservoir sampling seed.")

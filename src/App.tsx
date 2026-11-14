@@ -24,6 +24,7 @@ import { appendInterviewTurn } from './lib/projectInterviewTranscript';
 import { selectInterviewPersonas } from './lib/personaSelection';
 import type { InterviewTurn, PersonaSeed, ResearchDraft, ResearchProject } from './types/research';
 import { SITE_CREDIT } from './config/site';
+import { PrivacyNotice } from './components/PrivacyNotice';
 
 const STORAGE_KEY = 'personars-interview-project';
 
@@ -291,6 +292,7 @@ function ActivitySetupStep({
           <ClipboardList size={17} />
           활동 설정
         </div>
+        <PrivacyNotice />
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="과목" id="subject">
             <select
