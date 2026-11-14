@@ -45,10 +45,10 @@ VITE_INTERVIEW_COACH_API_URL= # AI 코치 서버 주소
 **주의: 서버 API 키를 쓰는 엔드포인트는 공개 인터넷에 열립니다.** 아래 보호 장치는 기본 수준이며, 비용을 확실히 막으려면 Gemini 프로젝트의 사용량 한도나 호스팅의 속도 제한을 반드시 따로 설정하세요.
 
 - **Vercel 함수** (`api/`): 환경변수 `GEMINI_API_KEY`를 설정합니다.
-  - 같은 사이트에서 온 요청만 허용합니다. 다른 사이트에서 부르려면 `ALLOWED_ORIGINS`에 출처를 쉼표로 적습니다. Origin 헤더가 없는 요청은 거부합니다.
+  - 브라우저에서 **다른 사이트가 이 API를 부르는 것**을 막습니다. 같은 사이트의 Origin이거나 `ALLOWED_ORIGINS`(쉼표로 구분)에 적힌 출처만 허용하고, Origin 헤더가 없는 요청은 거부합니다. **다만 이것은 인증이 아닙니다.** curl 같은 스크립트는 허용된 Origin 헤더를 직접 만들어 보낼 수 있으므로, 이 검사만으로 서버 키 남용을 막을 수는 없습니다. 아래 호출 제한과 Gemini 사용량 한도가 실제 안전장치입니다.
   - 요청 본문은 60,000자까지, 호출은 IP당 하루 300회(`API_DAILY_LIMIT`로 변경)까지 받습니다. 호출 횟수는 서버리스 인스턴스마다 따로 세므로 정확한 상한이 아닙니다.
-  - AI 응답이 실패했을 때 Cloudflare Worker를 대체 경로로 쓰려면 `CLOUDFLARE_PERSONA_API_URL`과 이 사이트의 주소 `PUBLIC_SITE_ORIGIN`을 함께 설정하고, 같은 주소를 Worker의 `ALLOWED_ORIGINS`에도 넣습니다. 둘 중 하나라도 없으면 대체 경로는 꺼집니다.
-- **Cloudflare Worker** (`worker/`): 배포 전 `worker/wrangler.jsonc`의 `ALLOWED_ORIGINS`에 본인 사이트 주소를, `kv_namespaces.id`에 본인 KV ID를 넣습니다. Origin이 없거나 목록에 없는 요청은 거부하고, 호출은 IP당 하루 `DAILY_LIMIT`회(기본 1500)로 셉니다.
+  - AI 응답이 실패했을 때 Cloudflare Worker를 대체 경로로 쓰려면 `CLOUDFLARE_PERSONA_API_URL`과 이 사이트의 주소 `PUBLIC_SITE_ORIGIN`을 함께 설정하고, 같은 주소를 Worker의 `ALLOWED_ORIGINS`에도 넣습니다. 둘 중 하나라도 없으면 대체 경로는 꺼집니다. 이 경로로 들어온 요청은 Worker가 Vercel의 출구 IP 하나로 보기 때문에, 모든 사용자가 Worker의 일일 한도를 함께 나눠 씁니다.
+- **Cloudflare Worker** (`worker/`): 배포 전 `worker/wrangler.jsonc`의 `ALLOWED_ORIGINS`에 본인 사이트 주소를, `kv_namespaces.id`에 본인 KV ID를 넣습니다. Origin이 없거나 목록에 없는 요청은 거부하고, 호출은 IP당 하루 `DAILY_LIMIT`회(기본 1500)로 셉니다. 이 Origin 검사도 위와 같은 이유로 인증이 아니라 브라우저의 다른 사이트 호출을 막는 용도입니다. 입력 길이(`latest` 1,000자, 대화 기록 20턴×1,500자)도 제한합니다.
 - API 키는 서버 환경변수에만 두고, 저장소나 `VITE_` 변수에 넣지 마세요(`VITE_` 값은 브라우저에 그대로 노출됩니다).
 - 학생이 입력한 내용은 외부 AI 서비스(Gemini 등)로 전송될 수 있습니다. 개인정보를 입력하지 않도록 수업에서 안내하세요.
 
