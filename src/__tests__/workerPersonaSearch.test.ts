@@ -83,11 +83,12 @@ test('worker persona search reports unavailable without R2 binding', async () =>
   const response = await worker.fetch(
     new Request('https://worker.test/persona-search', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: 'https://example.test' },
       body: JSON.stringify({ province: '서울', limit: 10 }),
     }),
     {
       AI: { run: async () => '' },
+      ALLOWED_ORIGINS: 'https://example.test',
       RATE_KV: { get: async () => '0', put: async () => undefined },
     } as never,
   );

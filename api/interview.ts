@@ -1,4 +1,5 @@
 import { buildSystemPrompt, ensurePrefix } from '../worker/src/prompt.js';
+import { guard } from './_lib/guard.js';
 
 declare const process: {
   env: Record<string, string | undefined>;
@@ -77,33 +78,7 @@ type StructuredGeminiText = {
 };
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  applyCors(req, res);
-
-  const proxyHeader = req.headers?.['x-gemini-proxy'] || req.headers?.['X-Gemini-Proxy'];
-  if (proxyHeader) {
-    const modelId = req.headers?.['x-gemini-model'] || req.headers?.['X-Gemini-Model'] || 'gemini-2.5-flash';
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY_not_configured_on_vercel' });
-    }
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
-        }
-      );
-      const data = await response.json();
-      return res.status(response.status).json(data);
-    } catch (err) {
-      return res.status(502).json({ error: 'gemini_proxy_failed', message: err instanceof Error ? err.message : 'error' });
-    }
-  }
-
-  if (req.method === 'OPTIONS') return res.status(204).json({});
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+  if (guard(req, res)) return;
 
   const body = normalizeBody(req.body);
   if (!isValidChatRequest(body)) return res.status(400).json({ error: 'invalid_request' });
@@ -135,14 +110,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   const fallback = await requestCloudflareFallback(body, attemptedModelIds, providerErrors);
   return res.status(fallback.status).json(fallback.body);
-}
-
-function applyCors(req: ApiRequest, res: ApiResponse) {
-  const origin = headerValue(req.headers?.origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'content-type');
-  res.setHeader('Vary', 'Origin');
-  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
 }
 
 function normalizeBody(body: unknown): unknown {
@@ -232,7 +199,10 @@ async function requestGemini(
 
 async function requestCloudflareFallback(body: ChatRequest, attemptedModelIds: string[], providerErrors: string[]) {
   const url = process.env.CLOUDFLARE_PERSONA_API_URL;
-  if (!url) {
+  // 워커는 Origin 없는 요청을 거부하므로, 이 사이트의 주소(PUBLIC_SITE_ORIGIN)를 Origin으로 보낸다.
+  // 같은 주소를 워커의 ALLOWED_ORIGINS에도 넣어야 한다.
+  const siteOrigin = process.env.PUBLIC_SITE_ORIGIN;
+  if (!url || !siteOrigin) {
     providerErrors.push('cloudflare-worker:not_configured');
     return { status: 502, body: { error: 'persona_proxy_not_configured', attemptedModelIds, providerErrors } };
   }
@@ -241,7 +211,7 @@ async function requestCloudflareFallback(body: ChatRequest, attemptedModelIds: s
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: siteOrigin },
       body: JSON.stringify(body),
     });
     const data = (await response.json()) as Record<string, unknown>;
@@ -312,10 +282,6 @@ function sceneGroundingText(body: ChatRequest): string {
   const lines = [`주제 단서: ${formatScene(primary)}`];
   if (background.length > 0) lines.push(`페르소나 배경 단서: ${background.slice(0, 2).map(formatScene).join(' / ')}`);
   return lines.join('\n');
-}
-
-function headerValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
 }
 
 function isValidChatRequest(body: unknown): body is ChatRequest {

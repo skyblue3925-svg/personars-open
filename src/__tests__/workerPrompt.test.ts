@@ -165,6 +165,7 @@ async function captureWorkerUserPrompt({
 }) {
   let capturedUserPrompt = '';
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     AI: {
       run: async (_model: string, input: { messages: Array<{ role: string; content: string }> }) => {
         capturedUserPrompt = input.messages.find((message) => message.role === 'user')?.content ?? '';
@@ -180,7 +181,7 @@ async function captureWorkerUserPrompt({
   await worker.fetch(
     new Request('https://worker.test', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { origin: 'https://example.test', 'content-type': 'application/json' },
       body: JSON.stringify({
         personaId: 'p-005',
         topic: '외모지상주의와 미디어의 관계. 청소년을 중심으로.',

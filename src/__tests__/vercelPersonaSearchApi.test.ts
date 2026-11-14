@@ -6,6 +6,8 @@ import handler from '../../api/persona-search';
 import type { PersonaSearchManifest } from '../lib/personaSearchIndex';
 import type { PersonaSeed } from '../types/research';
 
+process.env.ALLOWED_ORIGINS = 'https://example.test';
+
 declare const process: {
   env: Record<string, string | undefined>;
 };

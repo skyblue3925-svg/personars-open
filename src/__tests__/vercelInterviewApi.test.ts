@@ -1,6 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import handler from '../../api/interview';
 
+process.env.ALLOWED_ORIGINS = 'https://example.test';
+
 declare const process: {
   env: Record<string, string | undefined>;
 };
@@ -9,6 +11,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.GEMINI_API_KEY;
   delete process.env.CLOUDFLARE_PERSONA_API_URL;
+  delete process.env.PUBLIC_SITE_ORIGIN;
 });
 
 test('vercel interview api calls Gemini 3 Flash first', async () => {
@@ -45,6 +48,7 @@ test('vercel interview api calls Gemini 3 Flash first', async () => {
 test('vercel interview api falls back to Cloudflare Worker when Gemini is unavailable', async () => {
   process.env.GEMINI_API_KEY = 'test-key';
   process.env.CLOUDFLARE_PERSONA_API_URL = 'https://worker.example.test';
+  process.env.PUBLIC_SITE_ORIGIN = 'https://site.example.test';
   const fetchMock = vi
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(new Response('region blocked', { status: 400 }))
@@ -64,6 +68,7 @@ test('vercel interview api falls back to Cloudflare Worker when Gemini is unavai
   expect(response.statusCode).toBe(200);
   expect(fetchMock).toHaveBeenCalledTimes(3);
   expect(fetchMock.mock.calls[2][0]).toBe('https://worker.example.test');
+  expect((fetchMock.mock.calls[2][1]?.headers as Record<string, string>).origin).toBe('https://site.example.test');
   expect(response.body.modelId).toBe('@cf/openai/gpt-oss-20b');
   expect(response.body.providerErrors).toContain('gemini-3-flash-preview:400');
   expect(response.body.text).toContain('미디어 책임');

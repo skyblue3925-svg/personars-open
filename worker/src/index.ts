@@ -26,12 +26,15 @@ type Env = {
   GEMINI_API_KEY?: string;
   GEMINI_API_KEY_POOL?: string;
   ALLOWED_ORIGINS?: string;
-  // 선택: Gemini 지역 제한(400 location not supported)을 우회할 때 거칠 본인 프록시 주소. 비우면 우회하지 않는다.
-  GEMINI_PROXY_URL?: string;
   DAILY_LIMIT?: string;
   RATE_KV: RateLimitStore;
   PERSONA_SEARCH?: PersonaSearchR2Bucket;
 };
+
+const MAX_BODY_CHARS = 60_000;
+const MAX_LATEST_CHARS = 1_000;
+const MAX_HISTORY_TURNS = 20;
+const MAX_HISTORY_TEXT_CHARS = 1_500;
 
 type ChatRequest = {
   personaId: string;
@@ -130,18 +133,19 @@ export default {
     if (!isAllowedOrigin(origin, env)) return json({ error: 'origin_not_allowed' }, 403, cors);
 
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-    const rawSessionId = request.headers.get('X-Session-Id');
-    const sessionId = (rawSessionId && /^[A-Za-z0-9-]{1,80}$/.test(rawSessionId)) ? rawSessionId : 'unknown-session';
-    if (await isOverDailyLimit(ip, sessionId, env)) return json({ error: 'daily_limit_exceeded' }, 429, cors);
+    if (await isOverDailyLimit(ip, env)) return json({ error: 'daily_limit_exceeded' }, 429, cors);
 
     let body: ChatRequest;
     try {
-      body = (await request.json()) as ChatRequest;
+      const raw = await request.text();
+      if (raw.length > MAX_BODY_CHARS) return json({ error: 'payload_too_large' }, 413, cors);
+      body = JSON.parse(raw) as ChatRequest;
     } catch {
       return json({ error: 'invalid_json' }, 400, cors);
     }
 
     if (!isValidChatRequest(body)) return json({ error: 'invalid_request' }, 400, cors);
+    clampChatRequest(body);
 
     const character = body.character ? { ...body.character, persona: body.character.persona ?? body.persona } : undefined;
     const systemPrompt = buildSystemPrompt(character ?? body.persona, body.topic, body.researchQuestion, body.studentRole);
@@ -308,37 +312,9 @@ async function requestGemini(
         }
 
         if (!response.ok) {
-          const errText = await safeErrorText(response);
-          if (response.status === 400 && errText.toLowerCase().includes('location is not supported') && env.GEMINI_PROXY_URL) {
-            const proxyResponse = await fetch(
-              env.GEMINI_PROXY_URL,
-              {
-                method: 'POST',
-                headers: {
-                  'content-type': 'application/json',
-                  'X-Gemini-Proxy': 'true',
-                  'X-Gemini-Model': modelId,
-                },
-                body: JSON.stringify({
-                  systemInstruction: { parts: [{ text: systemPrompt }] },
-                  contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                  generationConfig: geminiGenerationConfig(modelId),
-                  safetySettings: [
-                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
-                  ],
-                }),
-              }
-            );
-            if (proxyResponse.ok) {
-              return { ai: (await proxyResponse.json()) as GeminiResponse, modelId };
-            }
-            providerErrors.push(`${modelId}:proxy_failed:${proxyResponse.status}:${await safeErrorText(proxyResponse)}`);
-            break;
-          }
-          providerErrors.push(`${modelId}:${response.status}:${errText}`);
+          // 상위 오류 본문은 서버 로그에만 남기고, 클라이언트에는 상태 코드만 돌려준다.
+          console.warn(`gemini ${modelId} ${response.status}: ${await safeErrorText(response)}`);
+          providerErrors.push(`${modelId}:${response.status}`);
           break;
         }
         return { ai: (await response.json()) as GeminiResponse, modelId };
@@ -350,7 +326,7 @@ async function requestGemini(
           delay *= 2;
           continue;
         }
-        providerErrors.push(`${modelId}:fetch_error:${err instanceof Error ? err.message : 'error'}`);
+        providerErrors.push(`${modelId}:fetch_error`);
         break;
       }
     }
@@ -402,7 +378,7 @@ async function requestWorkersAi(
       });
       return { ai, modelId, attemptedModelIds, providerErrors };
     } catch (error) {
-      providerErrors.push(`${modelId}:${error instanceof Error ? error.message : 'error'}`);
+      providerErrors.push(`${modelId}:error`);
       lastError = error;
     }
   }
@@ -492,6 +468,14 @@ function buildFallbackAnswer(body: ChatRequest): string {
   return `음... 제 경험으로는 ${experience}. 그래서 ${body.topic}을 생각하면 ${tension}. 이걸 전체 의견처럼 말하기는 어렵지만, 적어도 저는 그 장면 때문에 이 질문이 꽤 현실적으로 느껴져요.`;
 }
 
+// 입력 길이를 잘라 토큰 비용과 프롬프트 남용을 줄인다.
+function clampChatRequest(body: ChatRequest): void {
+  body.latest = body.latest.slice(0, MAX_LATEST_CHARS);
+  if (Array.isArray(body.history)) {
+    body.history = body.history.slice(-MAX_HISTORY_TURNS).map((turn) => ({ ...turn, text: String(turn.text ?? '').slice(0, MAX_HISTORY_TEXT_CHARS) }));
+  }
+}
+
 function isValidChatRequest(body: ChatRequest): boolean {
   return Boolean(
     body &&
@@ -523,7 +507,7 @@ function sceneGroundingText(body: ChatRequest): string {
 }
 
 function isAllowedOrigin(origin: string | null, env: Env): boolean {
-  if (!origin) return true;
+  if (!origin) return false;
   const allowed = (env.ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((item) => item.trim())
@@ -534,7 +518,7 @@ function isAllowedOrigin(origin: string | null, env: Env): boolean {
 function corsHeaders(origin: string | null, env: Env): Headers {
   const headers = new Headers({
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Allow-Headers': 'content-type, x-session-id',
     Vary: 'Origin',
   });
 

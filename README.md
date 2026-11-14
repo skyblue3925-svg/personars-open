@@ -42,10 +42,15 @@ VITE_INTERVIEW_COACH_API_URL= # AI 코치 서버 주소
 
 이 저장소는 AI 서버 주소를 포함하지 않습니다. AI 응답을 쓰려면 직접 배포하세요.
 
-- **Cloudflare Worker**: `worker/`. 배포 전 `worker/wrangler.jsonc`의 `ALLOWED_ORIGINS`에 본인 사이트 주소를, `kv_namespaces.id`에 본인 KV ID를 넣습니다. 하루 호출 한도는 `DAILY_LIMIT`입니다.
-- **Vercel 함수**: `api/`. `GEMINI_API_KEY`를 환경변수로 설정합니다. Worker를 뒤쪽 대체 경로로 쓰려면 `CLOUDFLARE_PERSONA_API_URL`을 설정합니다.
-- Gemini가 지역 제한(`location is not supported`)으로 막힐 때만 거칠 본인 프록시가 있다면 Worker의 `GEMINI_PROXY_URL`에 넣으세요. 비워 두면 우회하지 않습니다.
+**주의: 서버 API 키를 쓰는 엔드포인트는 공개 인터넷에 열립니다.** 아래 보호 장치는 기본 수준이며, 비용을 확실히 막으려면 Gemini 프로젝트의 사용량 한도나 호스팅의 속도 제한을 반드시 따로 설정하세요.
+
+- **Vercel 함수** (`api/`): 환경변수 `GEMINI_API_KEY`를 설정합니다.
+  - 같은 사이트에서 온 요청만 허용합니다. 다른 사이트에서 부르려면 `ALLOWED_ORIGINS`에 출처를 쉼표로 적습니다. Origin 헤더가 없는 요청은 거부합니다.
+  - 요청 본문은 60,000자까지, 호출은 IP당 하루 300회(`API_DAILY_LIMIT`로 변경)까지 받습니다. 호출 횟수는 서버리스 인스턴스마다 따로 세므로 정확한 상한이 아닙니다.
+  - AI 응답이 실패했을 때 Cloudflare Worker를 대체 경로로 쓰려면 `CLOUDFLARE_PERSONA_API_URL`과 이 사이트의 주소 `PUBLIC_SITE_ORIGIN`을 함께 설정하고, 같은 주소를 Worker의 `ALLOWED_ORIGINS`에도 넣습니다. 둘 중 하나라도 없으면 대체 경로는 꺼집니다.
+- **Cloudflare Worker** (`worker/`): 배포 전 `worker/wrangler.jsonc`의 `ALLOWED_ORIGINS`에 본인 사이트 주소를, `kv_namespaces.id`에 본인 KV ID를 넣습니다. Origin이 없거나 목록에 없는 요청은 거부하고, 호출은 IP당 하루 `DAILY_LIMIT`회(기본 1500)로 셉니다.
 - API 키는 서버 환경변수에만 두고, 저장소나 `VITE_` 변수에 넣지 마세요(`VITE_` 값은 브라우저에 그대로 노출됩니다).
+- 학생이 입력한 내용은 외부 AI 서비스(Gemini 등)로 전송될 수 있습니다. 개인정보를 입력하지 않도록 수업에서 안내하세요.
 
 ## 현재 제품 범위
 

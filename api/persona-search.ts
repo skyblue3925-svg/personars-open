@@ -9,6 +9,7 @@ import {
   type PersonaSearchSourceRow,
 } from '../src/lib/personaSearchIndex';
 import type { PersonaSeed } from '../src/types/research';
+import { guard } from './_lib/guard.js';
 
 declare const process: {
   cwd: () => string;
@@ -28,10 +29,7 @@ type ApiResponse = {
 };
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  applyCors(req, res);
-
-  if (req.method === 'OPTIONS') return res.status(204).json({});
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+  if (guard(req, res)) return;
 
   const request = normalizeBody(req.body);
   if (!isValidSearchRequest(request)) return res.status(400).json({ error: 'invalid_request' });
@@ -61,14 +59,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   } catch {
     return res.status(503).json({ error: 'persona_search_unavailable' });
   }
-}
-
-function applyCors(req: ApiRequest, res: ApiResponse) {
-  const origin = headerValue(req.headers?.origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'content-type');
-  res.setHeader('Vary', 'Origin');
-  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
 }
 
 function normalizeBody(body: unknown): unknown {
@@ -110,8 +100,4 @@ async function readShard(root: string, key: string): Promise<PersonaSeed[]> {
 
 async function readRowShard(root: string, key: string): Promise<PersonaSearchSourceRow[]> {
   return JSON.parse(await readFile(join(root, 'shards', shardFileName(key)), 'utf8')) as PersonaSearchSourceRow[];
-}
-
-function headerValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
 }

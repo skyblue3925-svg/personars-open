@@ -1,6 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import handler from '../../api/coach';
 
+process.env.ALLOWED_ORIGINS = 'https://example.test';
+
 declare const process: {
   env: Record<string, string | undefined>;
 };

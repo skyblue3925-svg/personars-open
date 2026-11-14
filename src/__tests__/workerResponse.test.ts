@@ -18,6 +18,7 @@ test('worker uses Gemini 3 Flash first when a Gemini key is configured', async (
     ),
   );
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     GEMINI_API_KEY: 'test-key',
     AI: {
       run: async () => {
@@ -32,7 +33,7 @@ test('worker uses Gemini 3 Flash first when a Gemini key is configured', async (
 
   const request = new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '청소년 스마트폰 사용과 수면',
@@ -104,6 +105,7 @@ test('worker falls back from Gemini 3 Flash to Gemini 2.5 Flash before Workers A
       ),
     );
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     GEMINI_API_KEY: 'test-key',
     AI: {
       run: async () => {
@@ -133,6 +135,7 @@ test('worker falls back to Workers AI when Gemini models fail', async () => {
     .mockResolvedValueOnce(new Response('quota exceeded', { status: 429 }));
   const requestedModels: string[] = [];
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     GEMINI_API_KEY: 'test-key',
     AI: {
       run: async (model: string) => {
@@ -153,7 +156,7 @@ test('worker falls back to Workers AI when Gemini models fail', async () => {
 
   const request = new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '외모지상주의와 미디어의 관계',
@@ -185,6 +188,7 @@ test('worker falls back to Workers AI when Gemini models fail', async () => {
 
 test('worker reads OpenAI-style choice responses from Workers AI models', async () => {
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     AI: {
       run: async () => ({
         choices: [
@@ -205,7 +209,7 @@ test('worker reads OpenAI-style choice responses from Workers AI models', async 
 
   const request = new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '외모지상주의와 미디어의 관계',
@@ -232,9 +236,10 @@ test('worker reads OpenAI-style choice responses from Workers AI models', async 
   expect(json.text).not.toContain('장면이 먼저 떠올라요');
 });
 
-test('worker rate limits sessions separately even with same IP', async () => {
+test('worker rate limits by IP even when the session id changes', async () => {
   const kvStored: Record<string, string> = {};
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     GEMINI_API_KEY: 'test-key',
     AI: {
       run: async () => ({
@@ -251,7 +256,7 @@ test('worker rate limits sessions separately even with same IP', async () => {
 
   const req1 = new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', 'X-Session-Id': 'session-A' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', 'X-Session-Id': 'session-A' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '주제',
@@ -263,7 +268,7 @@ test('worker rate limits sessions separately even with same IP', async () => {
 
   const req2 = new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', 'X-Session-Id': 'session-B' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', 'X-Session-Id': 'session-B' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '주제',
@@ -292,14 +297,13 @@ test('worker rate limits sessions separately even with same IP', async () => {
   expect(res2.status).toBe(200);
 
   const day = new Date().toISOString().slice(0, 10);
-  expect(kvStored[`persona-chat:${day}:1.2.3.4:session-A`]).toBe('1');
-  expect(kvStored[`persona-chat:${day}:1.2.3.4:session-B`]).toBe('1');
+  expect(kvStored[`persona-chat:${day}:1.2.3.4`]).toBe('2');
 });
 
 function buildBasicRequest() {
   return new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '외모지상주의와 미디어의 관계',
@@ -330,6 +334,7 @@ test('worker systemInstruction contains studentRole when studentRole is provided
     ),
   );
   const env = {
+    ALLOWED_ORIGINS: 'https://example.test',
     GEMINI_API_KEY: 'test-key',
     RATE_KV: {
       get: async () => '0',
@@ -339,7 +344,7 @@ test('worker systemInstruction contains studentRole when studentRole is provided
 
   const req = new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { origin: 'https://example.test', 'content-type': 'application/json' },
     body: JSON.stringify({
       personaId: 'p1',
       topic: '외모지상주의와 미디어의 관계',

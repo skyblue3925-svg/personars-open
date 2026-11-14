@@ -410,7 +410,7 @@ function ageGroupsForSearch(value: PersonaCandidateFilters['age']): string[] | u
 }
 
 function personaSearchApiUrl(): string {
-  return import.meta.env.VITE_PERSONA_SEARCH_API_URL ?? '/api/persona-search';
+  return import.meta.env.VITE_PERSONA_SEARCH_API_URL || '/api/persona-search';
 }
 
 function buildStructuredFilterOptions(personas: PersonaSeed[]) {

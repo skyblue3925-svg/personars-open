@@ -1,3 +1,5 @@
+import { guard } from './_lib/guard.js';
+
 declare const process: {
   env: Record<string, string | undefined>;
 };
@@ -79,10 +81,7 @@ type GeminiResponse = {
 };
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  applyCors(req, res);
-
-  if (req.method === 'OPTIONS') return res.status(204).json({});
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+  if (guard(req, res)) return;
   if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: 'coach_unavailable' });
 
   const body = normalizeBody(req.body);
@@ -107,14 +106,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tokensOut: feedback.usage?.candidatesTokenCount,
     },
   });
-}
-
-function applyCors(req: ApiRequest, res: ApiResponse) {
-  const origin = headerValue(req.headers?.origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'content-type');
-  res.setHeader('Vary', 'Origin');
-  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
 }
 
 function normalizeBody(body: unknown): unknown {
@@ -236,10 +227,6 @@ function clampScore(score: unknown): number {
 
 function stringOrDefault(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
-}
-
-function headerValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
 }
 
 function isValidCoachRequest(body: unknown): body is CoachRequest {
